@@ -27,7 +27,7 @@ const sourcesHeader = "## Sources"
 func modelDisallowsSamplingParams(model string) bool {
 	// Anthropic's Opus 4.7 and Opus 4.8 models reject non-default sampling parameters.
 	// Omit these params entirely for safest compatibility.
-	return strings.HasPrefix(model, "claude-opus-4-7") || strings.HasPrefix(model, "claude-opus-4-8")
+	return strings.HasPrefix(model, "claude-opus-4-7") || strings.HasPrefix(model, "claude-opus-4-8") || strings.HasPrefix(model, "claude-fable-5")
 }
 
 func NewClient() (ret *Client) {
@@ -44,6 +44,7 @@ func NewClient() (ret *Client) {
 	ret.defaultRequiredUserMessage = "Hi"
 	ret.models = []string{
 		// The following are the current supported models
+		string(anthropic.ModelClaudeFable5),
 		string(anthropic.ModelClaudeOpus4_8),
 		string(anthropic.ModelClaudeOpus4_7),
 		string(anthropic.ModelClaudeSonnet4_6),

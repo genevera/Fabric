@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.4.455 (2026-06-09)
+
+### PR [#2138](https://github.com/danielmiessler/Fabric/pull/2138) by [ksylvan](https://github.com/ksylvan): New Claude Fable model + cache OpenAI model discovery and handle provider rate limits
+
+- Add persistent cache for provider model discovery results, improving performance and reliability of provider integrations.
+- Serve stale model caches during discovery failures, ensuring continued operation when upstream providers are unavailable.
+- Add Claude Fable 5 Anthropic model support, with sampling parameters automatically omitted for compatibility.
+- Return concise localized errors for rate-limited model fetches, with updated translations across all supported locales.
+- Update Go dependencies for AI provider integrations to keep upstream libraries current.
+
 ## v1.4.454 (2026-06-02)
 
 ### PR [#2136](https://github.com/danielmiessler/Fabric/pull/2136) by [ksylvan](https://github.com/ksylvan): chore: extend sampling param exclusion to Opus 4.8 models
