@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/danielmiessler/fabric/internal/chat"
@@ -92,6 +93,12 @@ func TestNormalizeInputShape(t *testing.T) {
 			in:   []*chat.ChatCompletionMessage{sys("s"), asst("a"), sys("s2")},
 			want: []*chat.ChatCompletionMessage{sys("s"), asst("a"), usr("s2")},
 		},
+		{
+			// Assistant-only arrays are left unchanged because there is no system message to promote
+			name: "assistant only",
+			in:   []*chat.ChatCompletionMessage{asst("a")},
+			want: []*chat.ChatCompletionMessage{asst("a")},
+		},
 	}
 
 	for _, tt := range tests {
@@ -122,14 +129,17 @@ func TestNormalizeInputShapeWithNilMessages(t *testing.T) {
 	// Test nil at beginning, user later - should return original slice (has user)
 	in1 := []*chat.ChatCompletionMessage{nil, sys("sys1"), usr("user1")}
 	got1 := NormalizeInputShape(in1)
-	assert.Equal(t, in1, got1) // Should return original slice (has user)
+	assert.Equal(t, in1, got1)
+	assert.True(t, reflect.ValueOf(in1).Pointer() == reflect.ValueOf(got1).Pointer(), "should return original slice when a user message exists")
 
 	// Test nil at end, no user - should promote last non-nil system
 	in2 := []*chat.ChatCompletionMessage{sys("sys1"), sys("sys2"), nil}
 	got2 := NormalizeInputShape(in2)
 	assert.Len(t, got2, 3)
 	assert.Equal(t, sys("sys1"), got2[0])
-	// Last non-nil (sys2) should be promoted to user
+	assert.NotSame(t, in2, got2)
+	assert.NotSame(t, in2[1], got2[1])
+	// Last non-nil system should be promoted to user
 	expectedPromoted := usr("sys2")
 	assert.Equal(t, expectedPromoted.Role, got2[1].Role)
 	assert.Equal(t, expectedPromoted.Content, got2[1].Content)
@@ -138,10 +148,18 @@ func TestNormalizeInputShapeWithNilMessages(t *testing.T) {
 	// Test all nil
 	in3 := []*chat.ChatCompletionMessage{nil, nil, nil}
 	got3 := NormalizeInputShape(in3)
-	assert.Equal(t, in3, got3) // Should return original slice
+	assert.Equal(t, in3, got3)
+	assert.True(t, reflect.ValueOf(in3).Pointer() == reflect.ValueOf(got3).Pointer(), "should return original slice when all entries are nil")
 
 	// Test nil mixed with user (should return early due to user)
 	in4 := []*chat.ChatCompletionMessage{nil, usr("user1"), nil}
 	got4 := NormalizeInputShape(in4)
-	assert.Equal(t, in4, got4) // Should return original slice (has user)
+	assert.Equal(t, in4, got4)
+	assert.True(t, reflect.ValueOf(in4).Pointer() == reflect.ValueOf(got4).Pointer(), "should return original slice when a user message exists")
+
+	// Test no user and no system - should return original slice unchanged
+	in5 := []*chat.ChatCompletionMessage{nil, asst("assistant"), nil}
+	got5 := NormalizeInputShape(in5)
+	assert.Equal(t, in5, got5)
+	assert.True(t, reflect.ValueOf(in5).Pointer() == reflect.ValueOf(got5).Pointer(), "should return original slice when no system message exists to promote")
 }

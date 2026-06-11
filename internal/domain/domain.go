@@ -60,20 +60,20 @@ type ChatOptions struct {
 // message. Some LLM backends (vLLM, certain Bedrock endpoints) reject
 // requests that contain only system-role messages.
 //
-// When all messages are system, the last system message is promoted to user.
-// This keeps the instructional content semantically similar while satisfying
-// the API contract.
+// When the array contains no user message, the last non-nil system message is
+// promoted to user. This keeps the instructional content semantically similar
+// while satisfying the API contract.
 //
-// The function is idempotent: arrays that already contain a user message are
-// returned unchanged (returning the original slice). When no user message
-// exists, a new slice is returned with the last system message cloned and
-// its role changed to user.
+// The function is idempotent in terms of message content. Arrays that already
+// contain a user message are returned unchanged, reusing the original slice.
+// When a promotion occurs, a new slice is returned with the promoted message
+// cloned and its role changed to user.
 func NormalizeInputShape(msgs []*chat.ChatCompletionMessage) []*chat.ChatCompletionMessage {
 	if len(msgs) == 0 {
 		return msgs
 	}
 
-	// Scan for existing user message, skipping nil entries.
+	// Scan for an existing user message, skipping nil entries.
 	for _, msg := range msgs {
 		if msg != nil && msg.Role == chat.ChatMessageRoleUser {
 			return msgs
@@ -81,15 +81,16 @@ func NormalizeInputShape(msgs []*chat.ChatCompletionMessage) []*chat.ChatComplet
 	}
 
 	// Find the last non-nil system message to promote.
-	var lastIdx int
+	lastIdx := -1
 	for i := len(msgs) - 1; i >= 0; i-- {
-		if msgs[i] != nil {
+		if msgs[i] != nil && msgs[i].Role == chat.ChatMessageRoleSystem {
 			lastIdx = i
 			break
 		}
 	}
-	// If all entries are nil, return original slice (nothing to promote).
-	if lastIdx < 0 || msgs[lastIdx] == nil {
+
+	// If there is no system message to promote, return the original slice.
+	if lastIdx < 0 {
 		return msgs
 	}
 
@@ -99,7 +100,7 @@ func NormalizeInputShape(msgs []*chat.ChatCompletionMessage) []*chat.ChatComplet
 	ret := make([]*chat.ChatCompletionMessage, len(msgs))
 	copy(ret, msgs)
 
-	// Clone the last non-nil message (shallow copy is sufficient since we only change Role).
+	// Clone the promoted message (shallow copy is sufficient since we only change Role).
 	orig := ret[lastIdx]
 	newMsg := *orig
 	newMsg.Role = chat.ChatMessageRoleUser
@@ -107,9 +108,9 @@ func NormalizeInputShape(msgs []*chat.ChatCompletionMessage) []*chat.ChatComplet
 	return ret
 }
 
-// NormalizeMessages iterates over messages to enforce the odd-position rule for user
-// messages. Empty messages are dropped. When an even position would not contain a user
-// message, a synthetic user message with the provided default content is inserted.
+// NormalizeMessages removes empty messages and enforces the alternating
+// user-assistant shape expected by backends that require user messages at even
+// positions in the normalized sequence.
 func NormalizeMessages(msgs []*chat.ChatCompletionMessage, defaultUserMessage string) (ret []*chat.ChatCompletionMessage) {
 	// Iterate over messages to enforce the odd position rule for user messages
 	fullMessageIndex := 0
